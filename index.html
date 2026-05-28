@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>OptiFlow — Reduce Industry Waste & Boost Profit (Single File)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f7f7f9;
+      color: #222;
+      line-height: 1.5;
+    }
+
+    header {
+      background: #111827;
+      color: #fff;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0 0 10px 0;
+      font-size: 2.2rem;
+    }
+
+    header p {
+      margin: 6px 0;
+      opacity: 0.95;
+    }
+
+    .subtitle {
+      font-size: 1.05rem;
+      opacity: 0.9;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+
+    .upload-section,
+    .results-section,
+    .sample-data-section {
+      background: #fff;
+      padding: 20px 24px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      margin-bottom: 24px;
+    }
+
+    .upload-section h2,
+    .results-section h2,
+    .sample-data-section h2 {
+      margin-top: 0;
+    }
+
+    input[type="file"] {
+      margin-right: 10px;
+    }
+
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    #status {
+      margin-top: 10px;
+      font-size: 0.95rem;
+    }
+
+    #totalWaste {
+      font-size: 1.2rem;
+    }
+
+    #recommendations {
+      padding-left: 20px;
+    }
+
+    #recommendations li {
+      margin: 8px 0;
+    }
+
+    .note {
+      font-size: 0.9rem;
+      color: #555;
+      font-style: italic;
+    }
+
+    pre {
+      background: #f3f4f6;
+      padding: 12px 14px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.9rem;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 0.9rem;
+      color: #6b7280;
+    }
+
+    canvas {
+      max-width: 100%;
+      margin: 10px 0 0 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>OptiFlow</h1>
+    <p>Reduce waste, cut costs, and increase profit across any industry.</p>
+    <p class="subtitle">Upload your data and get instant cost-saving recommendations (single-file MVP).</p>
+  </header>
+
+  <main>
+    <section class="upload-section">
+      <h2>Upload Your Business Data (CSV)</h2>
+      <p>
+        Required column: <strong>cost</strong><br />
+        Optional columns: <strong>category</strong>, <strong>quantity</strong>, <strong>waste_quantity</strong>
+      </p>
+      <input type="file" id="csvFile" accept=".csv" />
+      <button id="analyzeBtn">Analyze Waste & Savings</button>
+      <p id="status"></p>
+    </section>
+
+    <section class="results-section" id="resultsSection" style="display:none;">
+      <h2>Waste Analysis Results</h2>
+      <p>
+        Total estimated waste:
+        <strong id="totalWaste">$0</strong>
+      </p>
+
+      <h3>Top Waste Sources</h3>
+      <canvas id="wasteChart"></canvas>
+
+      <h3>Recommended Actions</h3>
+      <ul id="recommendations"></ul>
+
+      <p class="note">
+        These are estimates. Actual savings depend on implementation and your specific operations.
+      </p>
+    </section>
+
+    <section class="sample-data-section">
+      <h2>Sample CSV Format</h2>
+      <pre>
+date,category,cost,quantity,waste_quantity
+2025-01-01,Ingredients,1200,500,50
+2025-01-01,Utilities,300,1,0
+2025-01-02,Ingredients,1300,520,60
+2025-01-02,Logistics,400,10,1
+      </pre>
+      <p>
+        Copy this into a text editor, save as <code>sample.csv</code>, and try it.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <p>OptiFlow MVP (single-file) — Built to solve industry waste and create profit for you and your users.</p>
+  </footer>
+
+  <script>
+    // Simple CSV parser
+    function parseCSV(text) {
+      const lines = text.trim().split(/\r?\n/);
+      if (lines.length === 0) return { headers: [], rows: [] };
+
+      const headers = lines[0].split(",").map(h => h.trim());
+      const rows = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const values = line.split(",").map(v => v.trim());
+        const row = {};
+        headers.forEach((h, idx) => {
+          row[h] = values[idx] !== undefined ? values[idx] : "";
+        });
+        rows.push(row);
+      }
+
+      return { headers, rows };
+    }
+
+    function analyzeData(rows) {
+      // Validate required column: cost
+      if (!rows.length) {
+        throw new Error("CSV is empty or has no data rows.");
+      }
+
+      if (!("cost" in rows[0])) {
+        throw new Error("CSV must contain a 'cost' column.");
+      }
+
+      let totalCost = 0;
+      for (const row of rows) {
+        const cost = parseFloat(row.cost);
+        if (!isNaN(cost)) {
+          totalCost += cost;
+        }
+      }
+
+      // Top waste sources by category
+      const categoryMap = {};
+      for (const row of rows) {
+        const category = row.category || "overall";
+        const cost = parseFloat(row.cost) || 0;
+        categoryMap[category] = (categoryMap[category] || 0) + cost;
+      }
+
+      const wasteSources = Object.entries(categoryMap)
+        .map(([category, cost]) => ({ category, cost }))
+        .sort((a, b) => b.cost - a.cost)
+        .slice(0, 5);
+
+      // Estimate waste ratio
+      let wasteRatio = 0.10; // default 10%
+      let totalQuantity = 0;
+      let totalWasteQuantity = 0;
+
+      if ("quantity" in rows[0] && "waste_quantity" in rows[0]) {
+        for (const row of rows) {
+          const qty = parseFloat(row.quantity) || 0;
+          const wasteQty = parseFloat(row.waste_quantity) || 0;
+          totalQuantity += qty;
+          totalWasteQuantity += wasteQty;
+        }
+        if (totalQuantity > 0) {
+          wasteRatio = totalWasteQuantity / totalQuantity;
+        }
+      }
+
+      const estimatedWaste = totalCost * wasteRatio;
+
+      const recommendations = [
+        {
+          action: "Reduce over-ordering in top category",
+          category: wasteSources[0]?.category || "general",
+          estimated_savings: Math.round(estimatedWaste * 0.20 * 100) / 100,
+          difficulty: "medium"
+        },
+        {
+          action: "Implement automated reorder points",
+          category: "inventory",
+          estimated_savings: Math.round(estimatedWaste * 0.15 * 100) / 100,
+          difficulty: "medium"
+        },
+        {
+          action: "Negotiate better supplier contracts",
+          category: "procurement",
+          estimated_savings: Math.round(estimatedWaste * 0.10 * 100) / 100,
+          difficulty: "high"
+        },
+        {
+          action: "Monitor and reduce energy usage during idle times",
+          category: "energy",
+          estimated_savings: Math.round(estimatedWaste * 0.08 * 100) / 100,
+          difficulty: "low"
+        }
+      ];
+
+      return {
+        total_estimated_waste: Math.round(estimatedWaste * 100) / 100,
+        top_waste_sources: wasteSources,
+        recommendations
+      };
+    }
+
+    let wasteChartInstance = null;
+
+    document.getElementById("analyzeBtn").addEventListener("click", async () => {
+      const fileInput = document.getElementById("csvFile");
+      const statusEl = document.getElementById("status");
+      const resultsSection = document.getElementById("resultsSection");
+
+      if (!fileInput.files.length) {
+        statusEl.textContent = "Please select a CSV file.";
+        return;
+      }
+
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+
+      statusEl.textContent = "Reading and analyzing your data...";
+      resultsSection.style.display = "none";
+
+      reader.onload = function (e) {
+        try {
+          const text = e.target.result;
+          const { rows } = parseCSV(text);
+          const report = analyzeData(rows);
+
+          statusEl.textContent = "Analysis complete.";
+
+          document.getElementById("totalWaste").textContent =
+            "$" + report.total_estimated_waste.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            });
+
+          // Chart
+          const ctx = document.getElementById("wasteChart").getContext("2d");
+          const labels = report.top_waste_sources.map(s => s.category);
+          const values = report.top_waste_sources.map(s => s.cost);
+
+          if (wasteChartInstance) {
+            wasteChartInstance.destroy();
+          }
+
+          wasteChartInstance = new Chart(ctx, {
+            type: "bar",
+            data: {
+              labels,
+              datasets: [{
+                label: "Cost by Category",
+                data: values,
+                backgroundColor: "#2563eb",
+                borderRadius: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { display: false }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    callback: (value) => "$" + value.toLocaleString()
+                  }
+                }
+              }
+            }
+          });
+
+          // Recommendations
+          const recList = document.getElementById("recommendations");
+          recList.innerHTML = "";
+          report.recommendations.forEach(rec => {
+            const li = document.createElement("li");
+            li.textContent =
+              `${rec.action} (${rec.category}) – Estimated savings: $${rec.estimated_savings.toLocaleString()} (difficulty: ${rec.difficulty})`;
+            recList.appendChild(li);
+          });
+
+          resultsSection.style.display = "block";
+
+        } catch (err) {
+          statusEl.textContent = "Error: " + err.message;
+        }
+      };
+
+      reader.onerror = function () {
+        statusEl.textContent = "Error reading file.";
+      };
+
+      reader.readAsText(file);
+    });
+  </script>
+</body>
+</html>
